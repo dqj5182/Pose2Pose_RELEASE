@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from nets.layer import make_conv_layers, make_linear_layers
-from utils.human_models import smpl, mano, flame
+from utils.human_models import smpl, mano #, flame
 from utils.transforms import sample_joint_features, soft_argmax_3d
 from config import cfg
 

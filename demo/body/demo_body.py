@@ -16,7 +16,7 @@ sys.path.insert(0, osp.join('..', '..', 'common'))
 from config import cfg
 from model import get_model
 from utils.preprocessing import process_bbox, generate_patch_image
-from utils.human_models import smpl, smpl_x, mano, flame
+from utils.human_models import smpl
 from utils.vis import render_mesh, save_obj
 import json
 
@@ -42,7 +42,7 @@ cfg.set_args(args.gpu_ids, 'body')
 cudnn.benchmark = True
 
 # snapshot load
-model_path = './snapshot_6_body.pth.tar'
+model_path = './snapshot_6.pth.tar'
 assert osp.exists(model_path), 'Cannot find model at ' + model_path
 print('Load checkpoint from {}'.format(model_path))
 model = get_model('test')

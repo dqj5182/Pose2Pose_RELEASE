@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from nets.resnet import ResNetBackbone
-from nets.module import PositionNet, RotationNet, FaceRegressor
+from nets.module import PositionNet, RotationNet #, FaceRegressor
 from nets.loss import CoordLoss, ParamLoss
-from utils.human_models import smpl, mano, flame
+from utils.human_models import smpl, mano #, flame
 from utils.transforms import rot6d_to_axis_angle
 from config import cfg
 import math

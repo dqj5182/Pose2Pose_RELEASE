@@ -138,4 +138,4 @@ class FLAME(object):
 smpl_x = SMPLX()
 smpl = SMPL()
 mano = MANO()
-flame = FLAME()
+#flame = FLAME()
