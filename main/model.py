@@ -2,13 +2,15 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from nets.resnet import ResNetBackbone
-from nets.module import PositionNet, RotationNet #, FaceRegressor
+from nets.module import PositionNet, RotationNet
 from nets.loss import CoordLoss, ParamLoss
-from utils.human_models import smpl, mano #, flame
+from utils.human_models import smpl, mano
 from utils.transforms import rot6d_to_axis_angle
 from config import cfg
 import math
 import copy
+
+
 
 class Model(nn.Module):
     def __init__(self, networks):
@@ -29,12 +31,6 @@ class Model(nn.Module):
             self.mano_layer = copy.deepcopy(mano.layer['right']).cuda()
             self.trainable_modules = [self.backbone, self.position_net, self.rotation_net]
 
-        # face networks
-        elif cfg.parts == 'face':
-            self.backbone = networks['backbone']
-            self.regressor = networks['regressor']
-            self.flame_layer = copy.deepcopy(flame.layer).cuda()
-            self.trainable_modules = [self.backbone, self.regressor]
 
         self.coord_loss = CoordLoss()
         self.param_loss = ParamLoss()
@@ -67,12 +63,12 @@ class Model(nn.Module):
             return root_pose, pose_param, shape_param, cam_trans
 
         elif cfg.parts == 'hand':
-            root_pose_6d, pose_param_6d, shape_param, cam_param = rotation_net(img_feat, joint_img)
+            root_pose_6d, pose_param_6d, shape_param, cam_param = rotation_net(img_feat, joint_img) # root_pose_6d: [b, 6], pose_param_6d: [b, 90], shape_param: [b, 10], cam_param: [b, 3], img_feat: [b, 2048, 8, 8], joint_img: [b, 21, 3]
             # change 6d pose -> axis angles
-            root_pose = rot6d_to_axis_angle(root_pose_6d).reshape(-1,3)
-            pose_param = rot6d_to_axis_angle(pose_param_6d.view(-1,6)).reshape(-1,(mano.orig_joint_num-1)*3)
-            cam_trans = self.get_camera_trans(cam_param)
-            return root_pose, pose_param, shape_param, cam_trans
+            root_pose = rot6d_to_axis_angle(root_pose_6d).reshape(-1,3) # root_pose: [b, 3]
+            pose_param = rot6d_to_axis_angle(pose_param_6d.view(-1,6)).reshape(-1,(mano.orig_joint_num-1)*3) # pose_param: [b, 45]
+            cam_trans = self.get_camera_trans(cam_param) # cam_trans: [b, 3]
+            return root_pose, pose_param, shape_param, cam_trans # root_pose: [b, 3], pose_param: [b, 45], shape_param: [b, 10], cam_trans: [b, 3]
 
     def get_coord(self, params, mode):
         batch_size = params['root_pose'].shape[0]
@@ -89,13 +85,7 @@ class Model(nn.Module):
             mesh_cam = output.vertices
             joint_cam = torch.bmm(torch.from_numpy(mano.joint_regressor).cuda()[None,:,:].repeat(batch_size,1,1), mesh_cam)
             root_joint_idx = mano.root_joint_idx
-        elif cfg.parts == 'face':
-            zero_pose = torch.zeros((1,3)).float().cuda().repeat(batch_size,1) # zero pose for eyes and neck
-            output = self.flame_layer(global_orient=params['root_pose'], jaw_pose=params['jaw_pose'], betas=params['shape'], expression=params['expr'], neck_pose=zero_pose, leye_pose=zero_pose, reye_pose=zero_pose)
-            # camera-centered 3D coordinate
-            mesh_cam = output.vertices
-            joint_cam = output.joints
-            root_joint_idx = flame.root_joint_idx
+
         
         if mode == 'test' and cfg.testset == 'AGORA': # use 45 joints for AGORA evaluation
             joint_cam = output.joints
@@ -120,7 +110,7 @@ class Model(nn.Module):
         mesh_cam = mesh_cam + cam_trans[:,None,:]
         return joint_proj, joint_cam, mesh_cam
 
-    def forward(self, inputs, targets, meta_info, mode):
+    def forward(self, inputs, targets, meta_info, mode): # inputs['img']: [b, 3, 256, 256] -> normalized image
         # network forward and get outputs
         # body network
         if cfg.parts == 'body':
@@ -138,15 +128,7 @@ class Model(nn.Module):
             mano_hand_pose = mano_hand_pose.view(-1,(mano.orig_joint_num-1)*3)
             mano_pose = torch.cat((mano_root_pose, mano_hand_pose),1)
 
-        # face network
-        elif cfg.parts == 'face':
-            img_feat = self.backbone(inputs['img'])
-            flame_root_pose, flame_jaw_pose, flame_shape, flame_expr, cam_param = self.regressor(img_feat)
-            flame_root_pose = rot6d_to_axis_angle(flame_root_pose)
-            flame_jaw_pose = rot6d_to_axis_angle(flame_jaw_pose)
-            cam_trans = self.get_camera_trans(cam_param)
-            joint_proj, joint_cam, mesh_cam = self.get_coord({'root_pose': flame_root_pose, 'jaw_pose': flame_jaw_pose, 'shape': flame_shape, 'expr': flame_expr, 'cam_trans': cam_trans}, mode)
-        
+
         if mode == 'train':
             # loss functions
             loss = {}
@@ -160,6 +142,7 @@ class Model(nn.Module):
                 loss['smpl_joint_cam'] = self.coord_loss(joint_cam, targets['smpl_joint_cam'], meta_info['smpl_joint_valid'])
                 
             elif cfg.parts == 'hand':
+                
                 loss['joint_img'] = self.coord_loss(joint_img, targets['joint_img'], meta_info['joint_trunc'], meta_info['is_3D'])
                 loss['mano_joint_img'] = self.coord_loss(joint_img, targets['mano_joint_img'], meta_info['mano_joint_trunc'])
                 loss['mano_pose'] = self.param_loss(mano_pose, targets['mano_pose'], meta_info['mano_pose_valid']) # computing loss with rotation matrix instead of axis-angle can avoid ambiguity of axis-angle. current: compute loss with axis-angle. should be fixed.
@@ -167,15 +150,9 @@ class Model(nn.Module):
                 loss['joint_proj'] = self.coord_loss(joint_proj, targets['joint_img'][:,:,:2], meta_info['joint_trunc'])
                 loss['joint_cam'] = self.coord_loss(joint_cam, targets['joint_cam'], meta_info['joint_valid'] * meta_info['is_3D'][:,None,None])
                 loss['mano_joint_cam'] = self.coord_loss(joint_cam, targets['mano_joint_cam'], meta_info['mano_joint_valid'])
+                import pdb; pdb.set_trace()
+                print('debug')
 
-            elif cfg.parts == 'face':
-                loss['flame_root_pose'] = self.param_loss(flame_root_pose, targets['flame_root_pose'], meta_info['flame_root_pose_valid'][:,None]) # computing loss with rotation matrix instead of axis-angle can avoid ambiguity of axis-angle. current: compute loss with axis-angle. should be fixed.
-                loss['flame_jaw_pose'] = self.param_loss(flame_jaw_pose, targets['flame_jaw_pose'], meta_info['flame_jaw_pose_valid'][:,None]) # computing loss with rotation matrix instead of axis-angle can avoid ambiguity of axis-angle. current: compute loss with axis-angle. should be fixed.
-                loss['flame_shape'] = self.param_loss(flame_shape, targets['flame_shape'], meta_info['flame_shape_valid'][:,None])
-                loss['flame_expr'] = self.param_loss(flame_expr, targets['flame_expr'], meta_info['flame_expr_valid'][:,None])
-                loss['joint_proj'] = self.coord_loss(joint_proj, targets['joint_img'][:,:,:2], meta_info['joint_trunc'])
-                loss['joint_cam'] = self.coord_loss(joint_cam, targets['joint_cam'], meta_info['joint_valid'] * meta_info['is_3D'][:,None,None])
-                loss['flame_joint_cam'] = self.coord_loss(joint_cam, targets['flame_joint_cam'], meta_info['flame_joint_valid'])
 
             return loss
         else:
@@ -206,15 +183,10 @@ class Model(nn.Module):
                     out['joint_valid'] = meta_info['joint_valid']
                 if 'bb2img_trans' in meta_info:
                     out['bb2img_trans'] = meta_info['bb2img_trans']
-            elif cfg.parts == 'face':
-                out['img'] = inputs['img']
-                out['flame_joint_cam'] = joint_cam
-                out['flame_mesh_cam'] = mesh_cam
-                out['flame_root_pose'] = flame_root_pose
-                out['flame_jaw_pose'] = flame_jaw_pose
-                out['flame_shape'] = flame_shape
-                out['flame_expr'] = flame_expr
+
             return out
+
+
 
 def init_weights(m):
     if type(m) == nn.ConvTranspose2d:
@@ -228,6 +200,8 @@ def init_weights(m):
     elif type(m) == nn.Linear:
         nn.init.normal_(m.weight,std=0.01)
         nn.init.constant_(m.bias,0)
+
+
 
 def get_model(mode):
     if cfg.parts == 'body':
@@ -251,13 +225,3 @@ def get_model(mode):
             rotation_net.apply(init_weights)
         model = Model({'backbone': backbone, 'position_net': position_net, 'rotation_net': rotation_net})
         return model
-
-    if cfg.parts == 'face':
-        backbone = ResNetBackbone(cfg.resnet_type)
-        regressor = FaceRegressor()
-        if mode == 'train':
-            backbone.init_weights()
-            regressor.apply(init_weights)
-        model = Model({'backbone': backbone, 'regressor': regressor})
-        return model
-

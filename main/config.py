@@ -4,11 +4,10 @@ import sys
 import numpy as np
 
 class Config:
-    
     ## dataset
-    trainset_3d = ['Human36M'] 
-    trainset_2d = ['MSCOCO', 'MPII']
-    testset = 'PW3D'
+    trainset_3d = ['InterHand26M'] #['FreiHAND'] 
+    trainset_2d = []
+    testset = 'InterHand26M' #'FreiHAND'
 
     ## model setting
     resnet_type = 50
@@ -22,7 +21,7 @@ class Config:
     test_batch_size = 64
 
     ## others
-    num_thread = 40
+    num_thread = 0 #40
     gpu_ids = '0'
     num_gpus = 1
     parts = 'body'

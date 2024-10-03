@@ -181,11 +181,13 @@ def process_db_coord(joint_img, joint_cam, joint_valid, do_flip, img_shape, flip
     joint_cam = np.dot(rot_aug_mat, joint_cam.transpose(1,0)).transpose(1,0)
 
     # affine transformation and root-relative depth
+    import pdb; pdb.set_trace()
     joint_img_xy1 = np.concatenate((joint_img[:,:2], np.ones_like(joint_img[:,:1])),1)
     joint_img[:,:2] = np.dot(img2bb_trans, joint_img_xy1.transpose(1,0)).transpose(1,0)
     joint_img[:,0] = joint_img[:,0] / cfg.input_img_shape[1] * cfg.output_hm_shape[2]
     joint_img[:,1] = joint_img[:,1] / cfg.input_img_shape[0] * cfg.output_hm_shape[1]
     joint_img[:,2] = (joint_img[:,2] / (cfg.bbox_3d_size / 2) + 1)/2. * cfg.output_hm_shape[0]
+
     
     # check truncation
     joint_trunc = joint_valid * ((joint_img[:,0] >= 0) * (joint_img[:,0] < cfg.output_hm_shape[2]) * \

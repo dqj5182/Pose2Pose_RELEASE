@@ -41,7 +41,8 @@ class InterHand26M(torch.utils.data.Dataset):
         with open(osp.join(self.annot_path, self.data_split, 'InterHand2.6M_' + self.data_split + '_MANO_NeuralAnnot.json')) as f:
             mano_params = json.load(f)
         datalist = []
-        for aid in db.anns.keys():
+        # for aid in db.anns.keys():
+        for aid in [*db.anns.keys()][:500]:
             ann = db.anns[aid]
             image_id = ann['image_id']
             img = db.loadImgs(image_id)[0]
@@ -71,6 +72,7 @@ class InterHand26M(torch.utils.data.Dataset):
             t = -np.dot(R,t.reshape(3,1)).reshape(3) # -Rt -> t
             focal, princpt = np.array(cameras[str(capture_id)]['focal'][str(cam)], dtype=np.float32).reshape(2), np.array(cameras[str(capture_id)]['princpt'][str(cam)], dtype=np.float32).reshape(2)
             cam_param = {'R': R, 't': t, 'focal': focal, 'princpt': princpt}
+
            
             # if root is not valid -> root-relative 3D pose is also not valid. Therefore, mark all joints as invalid
             joint_valid = np.array(ann['joint_valid'],dtype=np.float32).reshape(-1,1)
@@ -180,8 +182,10 @@ class InterHand26M(torch.utils.data.Dataset):
                 mano_pose_valid = np.zeros((mano.orig_joint_num*3), dtype=np.float32)
                 mano_shape_valid = float(False)
 
+            # import pdb; pdb.set_trace()
+
             inputs = {'img': img}
-            targets = {'joint_img': joint_img, 'mano_joint_img': mano_joint_img, 'joint_cam': joint_cam, 'mano_joint_cam': mano_joint_cam, 'mano_pose': mano_pose, 'mano_shape': mano_shape}
+            targets = {'joint_img': joint_img, 'mano_joint_img': mano_joint_img, 'joint_cam': joint_cam, 'mano_joint_cam': mano_joint_cam, 'mano_pose': mano_pose, 'mano_shape': mano_shape} # joint_img: [21, 3], mano_joint_img: [21, 3], joint_cam: [21, 3], mano_joint_cam: [21, 3], mano_pose: [48], mano_shape: [10]
             meta_info = {'joint_valid': joint_valid, 'joint_trunc': joint_trunc, 'mano_joint_trunc': mano_joint_trunc, 'mano_joint_valid': mano_joint_valid, 'mano_pose_valid': mano_pose_valid, 'mano_shape_valid': mano_shape_valid, 'is_3D': float(True)}
         else:
             inputs = {'img': img}

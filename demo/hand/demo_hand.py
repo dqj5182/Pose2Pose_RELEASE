@@ -14,11 +14,13 @@ sys.path.insert(0, osp.join('..', '..', 'main'))
 sys.path.insert(0, osp.join('..', '..', 'data'))
 sys.path.insert(0, osp.join('..', '..', 'common'))
 from config import cfg
-from model import get_model
-from utils.preprocessing import process_bbox, generate_patch_image
-from utils.human_models import smpl, smpl_x, mano, flame
+from model import Pose2Pose
+# from model import get_model
+from utils.preprocessing import load_img, process_bbox, generate_patch_image
+from utils.human_models import smpl, smpl_x, mano
 from utils.vis import render_mesh, save_obj
 import json
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -42,33 +44,37 @@ cfg.set_args(args.gpu_ids, 'hand')
 cudnn.benchmark = True
 
 # snapshot load
-model_path = './snapshot_12_hand.pth.tar'
+model_path = './snapshot_12.pth.tar'
 assert osp.exists(model_path), 'Cannot find model at ' + model_path
 print('Load checkpoint from {}'.format(model_path))
-model = get_model('test')
-model = DataParallel(model).cuda()
+model = Pose2Pose('test')
 ckpt = torch.load(model_path)
+for key in list(ckpt['network'].keys()):
+    ckpt['network'][key.replace('module.', '')] = ckpt['network'].pop(key)
 model.load_state_dict(ckpt['network'], strict=False)
+model = DataParallel(model).cuda()
 model.eval()
 
 # prepare input image
 transform = transforms.ToTensor()
 img_path = 'input_hand.png'
-original_img = cv2.imread(img_path)
+original_img = load_img(img_path)
 original_img_height, original_img_width = original_img.shape[:2]
 
 # prepare bbox (right hand)
 rhand_bbox = [239, 218, 305-239, 295-218] # xmin, ymin, width, height
 rhand_bbox = process_bbox(rhand_bbox, original_img_width, original_img_height)
 rhand_img, img2bb_trans, bb2img_trans = generate_patch_image(original_img, rhand_bbox, 1.0, 0.0, False, cfg.input_img_shape) 
-rhand_img = transform(rhand_img.astype(np.float32))/255
+# rhand_img = transform(rhand_img.astype(np.float32))/255
+rhand_img = torch.Tensor(rhand_img.astype(np.float32).transpose(2, 0, 1)) / 255.0
 rhand_img = rhand_img.cuda()[None,:,:,:]
 
 # prepare bbox (left hand)
 lhand_bbox = [306, 281, 368-306, 355-281] # xmin, ymin, width, height
 lhand_bbox = process_bbox(lhand_bbox, original_img_width, original_img_height)
 lhand_img, img2bb_trans, bb2img_trans = generate_patch_image(original_img, lhand_bbox, 1.0, 0.0, True, cfg.input_img_shape) # flip to the right hand image
-lhand_img = transform(lhand_img.astype(np.float32))/255
+# lhand_img = transform(lhand_img.astype(np.float32))/255
+lhand_img = torch.Tensor(lhand_img.astype(np.float32).transpose(2, 0, 1)) / 255.0
 lhand_img = lhand_img.cuda()[None,:,:,:]
 
 # forward
@@ -77,7 +83,8 @@ inputs = {'img': img}
 targets = {}
 meta_info = {}
 with torch.no_grad():
-    out = model(inputs, targets, meta_info, 'test')
+    # out = model(inputs, targets, meta_info, 'test')
+    out = model(inputs)
 rhand_mesh = out['mano_mesh_cam'].detach().cpu().numpy()[0]
 lhand_mesh = out['mano_mesh_cam'].detach().cpu().numpy()[1]
 lhand_img = torch.flip(lhand_img, [3]) # flip back to the left hand image

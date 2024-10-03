@@ -74,8 +74,10 @@ ${ROOT}
 |   |   |   |-- AGORA_train.json
 |   |   |   |-- AGORA_validation.json
 |   |   |   |-- AGORA_test_bbox.json
-|   |   |   |-- 1280x720
-|   |   |   |-- 3840x2160
+|   |   |   |-- images_1280x720
+|   |   |   |-- images_3840x2160
+|   |   |   |-- smplx_params_cam
+|   |   |   |-- cam_params
 |   |-- FFHQ
 |   |   |-- FFHQ_FLAME_NeuralAnnot.json
 |   |   |-- FFHQ.json
@@ -121,7 +123,7 @@ ${ROOT}
 * 3D body datasets: AGORA, Human3.6M, MPII, MPI-INF-3DHP, MSCOCO, and 3DPW
 * 3D hand datasets: AGORA, FreiHAND, and MSCOCO
 * 3D face datasets: AGORA, FFHQ, and MSCOCO
-* Download AGORA parsed data [[data](https://drive.google.com/drive/folders/18CWsL28e8v50rqEbYMoU4yHHWoGJdpg_?usp=sharing)][[parsing codes](tool/AGORA)]
+* Refer to AGORA [[parsing codes](tool/AGORA)]
 * Download FFHQ parsed data and FLAME parameters [[data](https://drive.google.com/file/d/1GbS5LaKgBlNuOfSXH82Lytni3yY6XI4x/view?usp=sharing)][[FLAME parameters from NeuralAnnot](https://drive.google.com/file/d/1u2Y2B5tVuZOnWy5oiNOKMkI22QUxiOKL/view?usp=sharing)]
 * Download FreiHAND parsed data [[data](https://drive.google.com/drive/folders/13qR8EhHFgvJ_AjgHz-JZKQQzYJX7oLpE?usp=sharing)] [[bbox](https://drive.google.com/file/d/1LqKP3gFCDNC2epV-vsdwOZeR6_5sUZU2/view?usp=sharing)]
 * Download Human3.6M parsed data and SMPL parameters [[data](https://drive.google.com/drive/folders/1r0B9I3XxIIW_jsXjYinDpL6NFcxTZart?usp=sharing)][[SMPL parameters from NeuralAnnot](https://drive.google.com/drive/folders/1ySxiuTCSdUEqbgTcx7bx02uMglPOkKjc?usp=sharing)]
